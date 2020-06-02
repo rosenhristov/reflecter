@@ -12,21 +12,18 @@ import java.util.Map;
 
 public class Application {
 
-    public static final String ROOT_PROJECT_PATH =
-            "/Users/rhristov/Documents/Rossen - Personal docs/rosen-projects/reflector/reflector-master/reflector";
-    public static String RELATIVE_PACKAGES_ROOT;
-    public static String classesRooPath;
-
-
     public static void main(String[] args) {
 
         Reflector reflector = new Reflector();
 
-        classesRooPath = reflector.getClassesRootPath(ROOT_PROJECT_PATH);
-        RELATIVE_PACKAGES_ROOT = reflector.getPackagesRoot(ROOT_PROJECT_PATH);
+        List<File> packages = reflector.getAppPackages(Application.class.getPackage().getName());
+        System.out.println("Packages found in the project:\n==========================");
+        packages.forEach(p -> System.out.println(p.getName()));
 
-        List<File> packages = reflector.getAppPackages(classesRooPath);
-        List<Class<?>> classes = reflector.getApplicationClasses(packages);
+        List<Class> classes = reflector.getApplicationClasses(packages);
+        System.out.println("\nClasses found in the project:\n==========================");
+        classes.forEach(c -> System.out.println(c.getSimpleName()));
+
         List<Class> services = reflector.collectServices(classes);
 
         List<BeanDescriptor> beanDescriptors = new LinkedList<>();

@@ -1,6 +1,7 @@
 package com.company.projects.application;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -23,129 +24,31 @@ import static com.company.projects.utils.Utils.isNotEmpty;
 
 public class Reflector {
 
-    public static String RELATIVE_CLASS_PACKAGES_ROOT;
-
-    public List<File> getAppPackages(String classesRootPath) {
-        if (isEmpty(classesRootPath)) {
-            return null;
-        }
-        List<File> packages = new ArrayList<>();
-        File root = new File(classesRootPath);
-        List<String> dirs = listPackages(root);
-        for (String dir : dirs) {
-            String relPath = RELATIVE_CLASS_PACKAGES_ROOT.replace(".", "/") + "/" + dir;
-            URL url = ClassLoader.getSystemClassLoader().getResource(relPath);
-            if (url == null) {
-                throw new RuntimeException("No resource for " + relPath);
-            }
-            File pack;
-            try {
-                pack = new File(url.toURI());
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(dir + ": (" + url + ") does not appear to be a valid URL/URI.", e);
-            } catch (IllegalArgumentException e) {
-                throw new RuntimeException(e.getMessage(), e);
-            }
-            if (pack != null) {
-                packages.add(pack);
-            }
-        }
-        return packages;
+    public List<File> getAppPackages(String packageName) {
+       ProjectScanner projectScanner = new ProjectScanner();
+        List<File> packages = new LinkedList<>();
+       try {
+           packages = projectScanner.getPackages(packageName);
+       } catch (IOException e) {
+           System.out.println("Exception occurred during collection of project packages:"
+                   + e.getMessage());
+       }
+       return packages;
     }
 
-    public String getClassesRootPath(String projectLocation) {
-        if (isEmpty(projectLocation)) {
-            return null;
-        }
-        File project = new File(projectLocation);
-        List<File> packages = Arrays.asList(project.listFiles());
-        File target = getSpecificPackage(packages, "target");
-        File classes = getSpecificChildPackage(target, "classes");
-        if (containsClasses(classes)) {
-            return classes.getPath();
-        }
-        List<File> children = Arrays.asList(classes.listFiles());
-        classes = excludePackagesAndFiles(children, Arrays.asList(new String[]{"META-INF"}));
-        while(!containsClasses(classes)) {
-            File[] child = classes.listFiles();
-            classes = child[0];
-        }
-        return classes.getParent();
-    }
-
-    private boolean containsClasses(File pack) {
-        if (isEmpty(pack.listFiles())) {
-            return false;
-        }
-        return Arrays.stream(pack.listFiles())
-                .filter(file -> file.isFile() && file.getName().endsWith(".class"))
-                .collect(Collectors.toList())
-                .size() > 0;
-
-    }
-
-    private File excludePackagesAndFiles(List<File> packLages, List<String> packagesToExclude) {
-        return packLages.stream()
-                .filter(pack -> pack.isDirectory() && !packagesToExclude.contains(pack.getName()))
-                .collect(Collectors.toList()).get(0);
-    }
-
-    public File getSpecificChildPackage(File pack, String packageName) {
-        return Arrays.stream(pack.listFiles()).filter(
-                file -> file.getName().equals(packageName)).collect(Collectors.toList()).get(0);
-    }
-
-    private File getSpecificPackage(List<File> packages, String packageName) {
-        return packages.stream().filter(
-                file -> file.getName().equals(packageName)).collect(Collectors.toList()).get(0);
-    }
-
-
-    public List<String> listPackages(File dir) {
-        String[] directories = dir.list((current, name) -> new File(current, name).isDirectory());
-    return isEmpty(directories) ? null : Arrays.asList(directories);
-    }
-
-    public List<Class<?>> getApplicationClasses(List<File> packages) {
-       return  packages.stream()
-                .flatMap(pack -> getClassesOfPackage(pack).stream())
-                .collect(Collectors.toList());
-    }
-
-    private List<Class> collectClasses(List<File> content) throws ClassNotFoundException {
+    public List<Class> getApplicationClasses(List<File> packages) {
+        ProjectScanner projectScanner = new ProjectScanner();
         List<Class> classes = new LinkedList<>();
-        for (File element : content) {
-            if (element.getName().endsWith(".class")) {
-                Class kl = Class.forName(element.getPath());
-                classes.add(kl);
-            } else {
-                collectClasses(Arrays.asList(element.listFiles()));
-            }
+        try {
+            classes = projectScanner.getClasses(packages);
+        } catch (ClassNotFoundException | IOException e) {
+            System.out.println("Exception occurred during collection of project classes:"
+                    + e.getMessage());
         }
         return classes;
     }
 
-    public List<Class<?>> getClassesOfPackage(File pack) {
-        List<Class<?>> classes = new ArrayList<>();
-        if (pack != null && pack.exists()) {
-            List<String> files = Arrays.asList(pack.list());
-            for (int i = 0; i < files.size(); i++) {
-                if (files.get(i).endsWith(".class")) {
-                    String className = String.join(".", RELATIVE_CLASS_PACKAGES_ROOT,
-                            pack.getName(), files.get(i).substring(0, files.get(i).length() - 6));
-                    try {
-                        Class<?> cl = Class.forName(className);
-                        classes.add(cl);
-                    } catch (ClassNotFoundException e) {
-                        throw new RuntimeException("ClassNotFoundException occurred while loading " + className, e);
-                    }
-                }
-            }
-        }
-        return classes;
-    }
-
-    public List<Class> collectServices(List<Class<?>> classes) {
+    public List<Class> collectServices(List<Class> classes) {
         return classes.stream().filter(klass -> isService(klass)).collect(Collectors.toList());
     }
 
@@ -182,32 +85,6 @@ public class Reflector {
         beanDescriptor.setFieldDependencies(annotatedFieldDepsMap);
 
         return beanDescriptor;
-    }
-
-    public String getPackagesRoot(String projectLocation) {
-        if (isEmpty(projectLocation)) {
-            return null;
-        }
-        File project = new File(projectLocation);
-        List<File> packages = Arrays.asList(project.listFiles());
-        File target = getSpecificPackage(packages, "target");
-        File classes = getSpecificChildPackage(target, "classes");
-        List<File> children = Arrays.asList(classes.listFiles());
-        classes = excludePackagesAndFiles(children, Arrays.asList(new String[]{"META-INF"}));
-        String packagesRoot = "";
-        while(!containsClasses(classes)) {
-            File[] child = classes.listFiles();
-            classes = child[0];
-            if (packagesRoot == "") {
-                packagesRoot = classes.getParent();
-                packagesRoot = packagesRoot.substring(packagesRoot.lastIndexOf("/") + 1);
-            } else {
-                String shortName = classes.getParent().substring(classes.getParent().lastIndexOf("/") + 1);
-                packagesRoot += "/" + shortName;
-            }
-        }
-        RELATIVE_CLASS_PACKAGES_ROOT = packagesRoot.replace("/", ".");
-        return packagesRoot;
     }
 
 
