@@ -41,7 +41,7 @@ public class Reflector {
         List<Class> classes = new LinkedList<>();
         try {
             classes = projectScanner.getClasses(packages);
-        } catch (ClassNotFoundException | IOException e) {
+        } catch (ClassNotFoundException e) {
             System.out.println("Exception occurred during collection of project classes:"
                     + e.getMessage());
         }

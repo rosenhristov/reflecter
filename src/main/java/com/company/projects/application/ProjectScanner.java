@@ -36,7 +36,7 @@ public class ProjectScanner {
     }
 
 
-    public List<Class> getClasses(List<File> packages) throws ClassNotFoundException, IOException {
+    public List<Class> getClasses(List<File> packages) throws ClassNotFoundException {
         List<Class> classes = new LinkedList<>();
         for (File pack : packages) {
             String path = pack.getPath();
@@ -47,26 +47,6 @@ public class ProjectScanner {
         return classes;
     }
 
-    /**
-     * Scans all classes accessible from the context class loader which belong to the given package and subpackages.
-     *
-     * @param packageName - the name of the package the classes of which have to be collected
-     * @return The classes
-     * @throws ClassNotFoundException
-     * @throws IOException
-     */
-    public Class[] getClasses(String packageName) throws ClassNotFoundException, IOException {
-        String path = packageName;
-        if (packageName.contains(".")) {
-            path = packageName.replace('.', '/');
-        }
-        List<File> files = getResources(path);
-        ArrayList<Class> classes = new ArrayList<>();
-        for (File file : files) {
-            classes.addAll(findClasses(file, packageName));
-        }
-        return classes.toArray(new Class[classes.size()]);
-    }
     /**
      * Recursive method used to find all classes in a given directory and subdirs.
      *
